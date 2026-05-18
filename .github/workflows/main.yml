@@ -41,6 +41,18 @@ jobs:
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res
 
+      - name: Generate keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore historia.keystore \
+            -alias historiakey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass argentina123 \
+            -keypass argentina123 \
+            -dname "CN=Historia Argentina Quest, OU=App, O=Imara, L=Buenos Aires, S=BA, C=AR"
+
       - name: Build Release APK
         run: |
           cd android
@@ -50,11 +62,12 @@ jobs:
       - name: Sign APK
         run: |
           APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
-          $ANDROID_SDK_ROOT/build-tools/$(ls $ANDROID_SDK_ROOT/build-tools | tail -1)/apksigner sign \
-            --ks ~/.android/debug.keystore \
-            --ks-key-alias androiddebugkey \
-            --ks-pass pass:android \
-            --key-pass pass:android \
+          echo "Signing: $APK"
+          $ANDROID_SDK_ROOT/build-tools/$(ls $ANDROID_SDK_ROOT/build-tools | sort | tail -1)/apksigner sign \
+            --ks historia.keystore \
+            --ks-key-alias historiakey \
+            --ks-pass pass:argentina123 \
+            --key-pass pass:argentina123 \
             --out android/app/build/outputs/apk/release/historia-argentina-quest.apk \
             "$APK"
 
