@@ -22,20 +22,58 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm install
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Prebuild Expo
+      - name: Expo prebuild
         run: npx expo prebuild --platform android --no-install
 
-      - name: Build APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - name: Bundle JavaScript
+        run: |
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res
+
+      - name: Build Release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Sign APK
+        run: |
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          $ANDROID_SDK_ROOT/build-tools/$(ls $ANDROID_SDK_ROOT/build-tools | tail -1)/apksigner sign \
+            --ks ~/.android/debug.keystore \
+            --ks-key-alias androiddebugkey \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out android/app/build/outputs/apk/release/historia-argentina-quest.apk \
+            "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: historia-argentina-quest
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: historia-argentina-quest-apk
+          path: android/app/build/outputs/apk/release/historia-argentina-quest.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "Historia Argentina Quest v${{ github.run_number }}"
+          body: |
+            ### Cómo instalar:
+            1. Descargá el `.apk`
+            2. Android → Ajustes → Seguridad → activá "Fuentes desconocidas"
+            3. Abrí el APK e instalá
+          files: android/app/build/outputs/apk/release/historia-argentina-quest.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
